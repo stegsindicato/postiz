@@ -55,7 +55,7 @@ export class InstagramV3Provider extends InstagramProvider {
     code: string;
     codeVerifier: string;
     refresh: string;
-  }): Promise<AuthTokenDetails> {
+  }): Promise<Awaited<ReturnType<InstagramProvider['authenticate']>>> {
     const { accessToken, expiresIn } = await instagramV3ExchangeCode({
       code: params.code,
       appId: process.env.INSTAGRAM_V3_APP_ID || '',
@@ -78,7 +78,8 @@ export class InstagramV3Provider extends InstagramProvider {
       // The SUAT has no refresh token. If Meta returns a time-limited token,
       // Postiz will require reauthorization rather than silently invalidating it.
       refreshToken: '',
-      ...(expiresIn ? { expiresIn } : {}),
+      // SUAT can be non-expiring; use the same long-lived fallback as Postiz.
+      expiresIn: expiresIn ?? 999999999,
     };
   }
 
