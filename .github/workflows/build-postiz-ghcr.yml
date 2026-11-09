@@ -1,0 +1,65 @@
+# Guardar en el repositorio como .github/workflows/build-postiz-ghcr.yml
+# Repositorio previsto: https://github.com/stegsindicato/postiz-steg
+# Fuente base: gitroomhq/postiz-app, tag v2.25.3 + Instagram V3 patch
+name: Build Postiz STEG (Instagram V3)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: postiz-steg-image
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish linux/amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare Instagram V3 icon
+        run: bash steg-instagram-v3/prepare-icon.sh
+
+      - name: Run Instagram V3 isolated tests
+        run: |
+          npm install --global typescript@5.9.3
+          bash steg-instagram-v3/test.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push candidate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.dev
+          platforms: linux/amd64
+          push: true
+          pull: true
+          build-args: |
+            NEXT_PUBLIC_VERSION=2.25.3-igv3
+          tags: |
+            ghcr.io/stegsindicato/postiz-steg:2.25.3-igv3-candidate
+            ghcr.io/stegsindicato/postiz-steg:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/stegsindicato/postiz-steg
+            org.opencontainers.image.description=STEG Postiz 2.25.3 with experimental Instagram V3 connector
+            org.opencontainers.image.licenses=AGPL-3.0
+
+      - name: Show resulting image
+        run: |
+          echo 'Published image: ghcr.io/stegsindicato/postiz-steg:2.25.3-igv3-candidate'
+          echo 'Immutable-by-convention tag: ghcr.io/stegsindicato/postiz-steg:sha-${{ github.sha }}'
